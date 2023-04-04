@@ -4,7 +4,6 @@ import {
   Placement,
   useFloating,
   UseFloatingReturn,
-  useMergeRefs,
   useTransitionStyles,
 } from "@floating-ui/react";
 import * as React from "react";
@@ -15,6 +14,36 @@ export function generateUEID() {
   const second = ("000" + ((Math.random() * 46656) | 0).toString(36)).slice(-3);
   return `${first}${second}`;
 }
+
+const getColor = (appearance?: AppearanceTypes) => {
+  switch (appearance) {
+    case "info":
+      return "#CDF0FE";
+    case "success":
+      return "#ECFCD3";
+    case "error":
+      return "#FFE2E5";
+    case "warning":
+      return "#FEFACF";
+    default:
+      return "#ffffff";
+  }
+};
+
+const getCountDownColor = (appearance?: AppearanceTypes) => {
+  switch (appearance) {
+    case "info":
+      return "#00B4D8";
+    case "success":
+      return "#5CB85C";
+    case "error":
+      return "#D9534F";
+    case "warning":
+      return "#F0AD4E";
+    default:
+      return "#ffffff";
+  }
+};
 
 export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
   const index = React.useState(0)[0];
@@ -28,7 +57,6 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
       inner({
         listRef,
         index,
-        padding: 0,
       }),
     ],
   });
@@ -88,6 +116,7 @@ export function ToastProvider({
   children: React.ReactNode;
 }) {
   const context = useToasts({ placement });
+
   return (
     <ToastContext.Provider value={{ ...context, autoDismissTimeout }}>
       <ul
@@ -122,36 +151,6 @@ export function ToastProvider({
     </ToastContext.Provider>
   );
 }
-
-const getColor = (appearance?: AppearanceTypes) => {
-  switch (appearance) {
-    case "info":
-      return "#CDF0FE";
-    case "success":
-      return "#ECFCD3";
-    case "error":
-      return "#FFE2E5";
-    case "warning":
-      return "#FEFACF";
-    default:
-      return "#ffffff";
-  }
-};
-
-const getCountDownColor = (appearance?: AppearanceTypes) => {
-  switch (appearance) {
-    case "info":
-      return "#00B4D8";
-    case "success":
-      return "#5CB85C";
-    case "error":
-      return "#D9534F";
-    case "warning":
-      return "#F0AD4E";
-    default:
-      return "#ffffff";
-  }
-};
 
 type ToastContentProps = {
   toastId: string;
