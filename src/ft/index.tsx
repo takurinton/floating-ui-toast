@@ -28,6 +28,7 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
       inner({
         listRef,
         index,
+        padding: 0,
       }),
     ],
   });
@@ -87,17 +88,18 @@ export function ToastProvider({
   children: React.ReactNode;
 }) {
   const context = useToasts({ placement });
-  const ref = useMergeRefs([
-    context.refs.setReference,
-    context.refs.setFloating,
-  ]);
-
   return (
     <ToastContext.Provider value={{ ...context, autoDismissTimeout }}>
       <ul
-        ref={ref}
+        ref={context.refs.setFloating}
         style={{
           position: context.strategy,
+          // TODO: dynamic style from placement prop
+          left: "50%",
+          transform: "translateX(-50%)",
+          // remove default ul padding, margin
+          padding: 0,
+          margin: 0,
         }}
       >
         {context.toasts.map(
