@@ -1,12 +1,9 @@
 import {
-  autoUpdate,
   ExtendedRefs,
-  FloatingPortal,
   inner,
   Placement,
   useFloating,
   UseFloatingReturn,
-  useMergeRefs,
   useTransitionStyles,
 } from "@floating-ui/react";
 import * as React from "react";
@@ -18,6 +15,36 @@ export function generateUEID() {
   return `${first}${second}`;
 }
 
+const getColor = (appearance?: AppearanceTypes) => {
+  switch (appearance) {
+    case "info":
+      return "#CDF0FE";
+    case "success":
+      return "#ECFCD3";
+    case "error":
+      return "#FFE2E5";
+    case "warning":
+      return "#FEFACF";
+    default:
+      return "#ffffff";
+  }
+};
+
+const getCountDownColor = (appearance?: AppearanceTypes) => {
+  switch (appearance) {
+    case "info":
+      return "#00B4D8";
+    case "success":
+      return "#5CB85C";
+    case "error":
+      return "#D9534F";
+    case "warning":
+      return "#F0AD4E";
+    default:
+      return "#ffffff";
+  }
+};
+
 export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
   const index = React.useState(0)[0];
   const [toasts, setToasts] = React.useState<ToastsType>([]);
@@ -26,7 +53,6 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
   const data = useFloating({
     placement,
     open: true,
-    whileElementsMounted: autoUpdate,
     middleware: [
       inner({
         listRef,
@@ -91,14 +117,20 @@ export function ToastProvider({
 }) {
   const context = useToasts({ placement });
 
-  const ref = useMergeRefs([
-    context.refs.setReference,
-    context.refs.setFloating,
-  ]);
-
   return (
     <ToastContext.Provider value={{ ...context, autoDismissTimeout }}>
-      <div ref={ref}>
+      <ul
+        ref={context.refs.setFloating}
+        style={{
+          position: context.strategy,
+          // TODO: dynamic style from placement prop
+          left: "50%",
+          transform: "translateX(-50%)",
+          // remove default ul padding, margin
+          padding: 0,
+          margin: 0,
+        }}
+      >
         {context.toasts.map(
           ({ id, content, appearance, autoDismiss }, index) => (
             <ToastElement
@@ -109,58 +141,26 @@ export function ToastProvider({
               ref={(node) => {
                 context.listRef.current[index] = node;
               }}
-              i={index}
             >
               {content}
             </ToastElement>
           )
         )}
-      </div>
+      </ul>
       {children}
     </ToastContext.Provider>
   );
 }
 
-const getColor = (appearance?: AppearanceTypes) => {
-  switch (appearance) {
-    case "info":
-      return "#CDF0FE";
-    case "success":
-      return "#ECFCD3";
-    case "error":
-      return "#FFE2E5";
-    case "warning":
-      return "#FEFACF";
-    default:
-      return "#ffffff";
-  }
-};
-
-const getCountDownColor = (appearance?: AppearanceTypes) => {
-  switch (appearance) {
-    case "info":
-      return "#00B4D8";
-    case "success":
-      return "#5CB85C";
-    case "error":
-      return "#D9534F";
-    case "warning":
-      return "#F0AD4E";
-    default:
-      return "#ffffff";
-  }
-};
-
 type ToastContentProps = {
-  i: number;
   toastId: string;
   appearance?: AppearanceTypes;
   autoDismiss?: boolean;
   children: React.ReactNode;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-export const ToastElement = React.forwardRef<HTMLDivElement, ToastContentProps>(
-  ({ i, toastId, appearance, autoDismiss, children }, propRef) => {
+export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
+  ({ toastId, appearance, autoDismiss, children }, propRef) => {
     const [timerId, setTimerId] = React.useState<number | null>(null);
     const { context, removeToast, autoDismissTimeout } = useToastsContext();
     const { styles } = useTransitionStyles(context, {
@@ -184,7 +184,7 @@ export const ToastElement = React.forwardRef<HTMLDivElement, ToastContentProps>(
         removeToast(toastId);
       }, autoDismissTimeout);
       setTimerId(id);
-    }, [autoDismiss, i, removeToast]);
+    }, [autoDismiss, removeToast]);
 
     const stopTimer = React.useCallback(() => {
       if (timerId) {
@@ -204,59 +204,62 @@ export const ToastElement = React.forwardRef<HTMLDivElement, ToastContentProps>(
       };
     }, []);
 
-    return (
-      <FloatingPortal>
-        {/* MEMO: css library or ... */}
-        <style>
-          {`@keyframes autoDismiss {
+    // for timeout progress bar
+    React.useEffect(() => {
+      if (autoDismiss && !document.getElementById("autoDismissStyle")) {
+        const style = document.createElement("style");
+        Object.assign(style, {
+          id: "autoDismissStyle",
+          innerHTML: `@keyframes autoDismiss {
             from {
               width: 100%;
             }
             to {
               width: 0%;
             }
-          }`}
-        </style>
+          }`,
+        });
+        document.head.appendChild(style);
+      }
+    });
+
+    return (
+      <li
+        ref={propRef}
+        tabIndex={-1}
+        style={{
+          width: "300px",
+          backgroundColor: getColor(appearance),
+          padding: "1rem",
+          marginBottom: "1rem",
+          borderRadius: 8,
+          boxShadow: "rgba(0, 0, 0, 0.35) 0px 5px 15px",
+          display: "flex",
+          ...styles,
+        }}
+      >
+        {children}
         <div
-          ref={propRef}
-          style={{
-            width: "300px",
-            backgroundColor: getColor(appearance),
-            padding: "1rem",
-            borderRadius: 8,
-            boxShadow: "rgba(0, 0, 0, 0.35) 0px 5px 15px",
-            position: "absolute",
-            right: 0,
-            left: 0,
-            top: i * 75,
-            margin: "auto",
-            display: "flex",
-            ...styles,
+          style={{ position: "absolute", right: "10px", cursor: "pointer" }}
+          onClick={() => {
+            removeToast(toastId);
           }}
         >
-          {children}
-          <div
-            style={{ position: "absolute", right: "10px", cursor: "pointer" }}
-            onClick={() => {
-              removeToast(toastId);
-            }}
-          >
-            {/* TODO: svg icon */}×
-          </div>
-          <div
-            style={{
-              animation: `autoDismiss ${autoDismissTimeout}ms linear`,
-              backgroundColor: getCountDownColor(appearance),
-              position: "absolute",
-              height: "3px",
-              width: 0,
-              top: 0,
-              left: 0,
-              opacity: autoDismiss ? 1 : 0,
-            }}
-          />
+          {/* TODO: svg icon */}×
         </div>
-      </FloatingPortal>
+        <div
+          style={{
+            animation: `autoDismiss ${autoDismissTimeout}ms linear`,
+            backgroundColor: getCountDownColor(appearance),
+            position: "absolute",
+            height: "3px",
+            width: 0,
+            top: 0,
+            left: 0,
+            opacity: autoDismiss ? 1 : 0,
+          }}
+        />
+      </li>
     );
   }
 );
