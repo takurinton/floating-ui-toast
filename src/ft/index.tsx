@@ -11,6 +11,7 @@ import {
   useHover,
   useInteractions,
   useListNavigation,
+  useRole,
   useTransitionStyles,
 } from "@floating-ui/react";
 import * as React from "react";
@@ -78,6 +79,7 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== toastId));
   };
 
+  const role = useRole(data.context);
   const click = useClick(data.context);
   const hover = useHover(data.context);
   const dismiss = useDismiss(data.context);
@@ -92,6 +94,7 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
       listRef,
       index,
       toasts,
+      role,
       click,
       hover,
       dismiss,
@@ -105,6 +108,7 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
       listRef,
       index,
       toasts,
+      role,
       click,
       hover,
       dismiss,
@@ -121,6 +125,7 @@ type ContextType = {
   listRef: React.MutableRefObject<Array<HTMLElement | null>>;
   index: number | null;
   toasts: ToastsType;
+  role: ElementProps;
   click: ElementProps;
   hover: ElementProps;
   setIndex: (index: number) => void;
@@ -155,6 +160,7 @@ export function ToastProvider({
 }) {
   const context = useToasts({ placement });
   const { getFloatingProps } = useInteractions([
+    context.role,
     context.dismiss,
     context.click,
     context.hover,
@@ -218,6 +224,7 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
       context,
       removeToast,
       autoDismissTimeout,
+      role,
       dismiss,
       click,
       hover,
@@ -227,6 +234,7 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
       React.useState(autoDismissTimeout);
     const [startTime, setStartTime] = React.useState(0);
     const { getItemProps } = useInteractions([
+      role,
       dismiss,
       click,
       hover,
