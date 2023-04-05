@@ -223,6 +223,9 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
       hover,
       listNavigation,
     } = useToastsContext();
+    const [remainingTime, setRemainingTime] =
+      React.useState(autoDismissTimeout);
+    const [startTime, setStartTime] = React.useState(0);
     const { getItemProps } = useInteractions([
       dismiss,
       click,
@@ -249,7 +252,7 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
       if (isRunning && autoDismiss) {
         const id = setTimeout(() => {
           removeToast(toastId);
-        }, autoDismissTimeout);
+        }, remainingTime);
         setTimerId(id);
       }
       return () => {
@@ -259,15 +262,20 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
 
     const startTimer = () => {
       setIsRunning(true);
+      setStartTime(Date.now());
     };
 
     const stopTimer = () => {
       setIsRunning(false);
+      setRemainingTime(
+        (remainingTime) => remainingTime - (Date.now() - startTime)
+      );
       clearTimeout(timerId);
     };
 
     const resumeTimer = () => {
       setIsRunning(true);
+      setStartTime(Date.now());
     };
 
     React.useEffect(() => {
@@ -324,16 +332,16 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
               removeToast(toastId);
             }
           },
-          onFocus: () => {
-            if (autoDismiss) {
-              stopTimer();
-            }
-          },
-          onBlur: () => {
-            if (autoDismiss) {
-              resumeTimer();
-            }
-          },
+          // onFocus: () => {
+          //   if (autoDismiss) {
+          //     stopTimer();
+          //   }
+          // },
+          // onBlur: () => {
+          //   if (autoDismiss) {
+          //     resumeTimer();
+          //   }
+          // },
           onMouseOver: () => {
             if (autoDismiss) {
               stopTimer();
