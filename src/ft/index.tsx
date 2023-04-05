@@ -84,10 +84,7 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
   const listNavigation = useListNavigation(data.context, {
     listRef,
     activeIndex: index,
-    onNavigate: (i) => {
-      console.log(i);
-      setIndex(i);
-    },
+    onNavigate: setIndex,
   });
 
   return React.useMemo(
@@ -122,7 +119,7 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
 
 type ContextType = {
   listRef: React.MutableRefObject<Array<HTMLElement | null>>;
-  index: number;
+  index: number | null;
   toasts: ToastsType;
   click: ElementProps;
   hover: ElementProps;
@@ -215,7 +212,8 @@ type ToastContentProps = {
 
 export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
   ({ idx, toastId, appearance, autoDismiss, children }, propRef) => {
-    const [timerId, setTimerId] = React.useState<number | null>(null);
+    const [timerId, setTimerId] = React.useState<number | undefined>();
+    const [isRunning, setIsRunning] = React.useState(false);
     const {
       context,
       removeToast,
@@ -247,19 +245,30 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
       }),
     });
 
-    const startTimer = React.useCallback(() => {
-      const id = setTimeout(() => {
-        removeToast(toastId);
-      }, autoDismissTimeout);
-      setTimerId(id);
-    }, [autoDismiss, removeToast]);
-
-    const stopTimer = React.useCallback(() => {
-      if (timerId) {
-        clearTimeout(timerId);
-        setTimerId(null);
+    React.useEffect(() => {
+      if (isRunning && autoDismiss) {
+        const id = setTimeout(() => {
+          removeToast(toastId);
+        }, autoDismissTimeout);
+        setTimerId(id);
       }
-    }, [timerId]);
+      return () => {
+        isRunning && autoDismiss && clearTimeout(timerId);
+      };
+    }, [isRunning]);
+
+    const startTimer = () => {
+      setIsRunning(true);
+    };
+
+    const stopTimer = () => {
+      setIsRunning(false);
+      clearTimeout(timerId);
+    };
+
+    const resumeTimer = () => {
+      setIsRunning(true);
+    };
 
     React.useEffect(() => {
       if (autoDismiss) {
@@ -293,9 +302,11 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
 
     return (
       <li
+        className={toastId}
         ref={propRef}
         role="status"
         aria-atomic="true"
+        aria-hidden="false"
         tabIndex={0}
         style={{
           width: "300px",
@@ -311,6 +322,26 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
           onKeyDown: (e) => {
             if (e.key === "Enter") {
               removeToast(toastId);
+            }
+          },
+          onFocus: () => {
+            if (autoDismiss) {
+              stopTimer();
+            }
+          },
+          onBlur: () => {
+            if (autoDismiss) {
+              resumeTimer();
+            }
+          },
+          onMouseOver: () => {
+            if (autoDismiss) {
+              stopTimer();
+            }
+          },
+          onMouseLeave: () => {
+            if (autoDismiss) {
+              resumeTimer();
             }
           },
         })}
@@ -334,6 +365,7 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
             top: 0,
             left: 0,
             opacity: autoDismiss ? 1 : 0,
+            animationPlayState: isRunning ? "running" : "paused",
           }}
         />
       </li>
