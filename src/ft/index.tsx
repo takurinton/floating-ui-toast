@@ -1,9 +1,16 @@
 import {
+  ElementProps,
   ExtendedRefs,
+  FloatingFocusManager,
   inner,
   Placement,
+  useClick,
+  useDismiss,
   useFloating,
   UseFloatingReturn,
+  useHover,
+  useInteractions,
+  useListNavigation,
   useTransitionStyles,
 } from "@floating-ui/react";
 import * as React from "react";
@@ -46,7 +53,7 @@ const getCountDownColor = (appearance?: AppearanceTypes) => {
 };
 
 export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
-  const index = React.useState(0)[0];
+  const [index, setIndex] = React.useState<number | null>(0);
   const [toasts, setToasts] = React.useState<ToastsType>([]);
   const listRef = React.useRef<Array<HTMLElement | null>>([]);
 
@@ -56,7 +63,7 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
     middleware: [
       inner({
         listRef,
-        index,
+        index: index ?? 0,
       }),
     ],
   });
@@ -71,16 +78,45 @@ export function useToasts({ placement = "bottom" }: { placement?: Placement }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== toastId));
   };
 
+  const click = useClick(data.context);
+  const hover = useHover(data.context);
+  const dismiss = useDismiss(data.context);
+  const listNavigation = useListNavigation(data.context, {
+    listRef,
+    activeIndex: index,
+    onNavigate: (i) => {
+      console.log(i);
+      setIndex(i);
+    },
+  });
+
   return React.useMemo(
     () => ({
       listRef,
       index,
       toasts,
+      click,
+      hover,
+      dismiss,
+      listNavigation,
+      setIndex,
       addToast,
       removeToast,
       ...data,
     }),
-    [listRef, index, toasts, addToast, removeToast, data]
+    [
+      listRef,
+      index,
+      toasts,
+      click,
+      hover,
+      dismiss,
+      listNavigation,
+      setIndex,
+      addToast,
+      removeToast,
+      data,
+    ]
   );
 }
 
@@ -88,6 +124,11 @@ type ContextType = {
   listRef: React.MutableRefObject<Array<HTMLElement | null>>;
   index: number;
   toasts: ToastsType;
+  click: ElementProps;
+  hover: ElementProps;
+  setIndex: (index: number) => void;
+  dismiss: ElementProps;
+  listNavigation: ElementProps;
   addToast: AddToast;
   removeToast: (toastId: string) => void;
   refs: ExtendedRefs<any>; // TODO: fix this
@@ -116,43 +157,56 @@ export function ToastProvider({
   children: React.ReactNode;
 }) {
   const context = useToasts({ placement });
+  const { getFloatingProps } = useInteractions([
+    context.dismiss,
+    context.click,
+    context.hover,
+    context.listNavigation,
+  ]);
 
   return (
     <ToastContext.Provider value={{ ...context, autoDismissTimeout }}>
-      <ul
-        ref={context.refs.setFloating}
-        style={{
-          position: context.strategy,
-          // TODO: dynamic style from placement prop
-          left: "50%",
-          transform: "translateX(-50%)",
-          // remove default ul padding, margin
-          padding: 0,
-          margin: 0,
-        }}
-      >
-        {context.toasts.map(
-          ({ id, content, appearance, autoDismiss }, index) => (
-            <ToastElement
-              key={index}
-              toastId={id}
-              appearance={appearance}
-              autoDismiss={autoDismiss}
-              ref={(node) => {
-                context.listRef.current[index] = node;
-              }}
-            >
-              {content}
-            </ToastElement>
-          )
-        )}
-      </ul>
+      <FloatingFocusManager context={context.context}>
+        <ul
+          ref={context.refs.setFloating}
+          role="region"
+          aria-live="polite"
+          style={{
+            position: context.strategy,
+            // TODO: dynamic style from placement prop
+            left: "50%",
+            transform: "translateX(-50%)",
+            // remove default ul padding, margin
+            padding: 0,
+            margin: 0,
+          }}
+          {...getFloatingProps()}
+        >
+          {context.toasts.map(
+            ({ id, content, appearance, autoDismiss }, index) => (
+              <ToastElement
+                idx={index}
+                key={index}
+                toastId={id}
+                appearance={appearance}
+                autoDismiss={autoDismiss}
+                ref={(node) => {
+                  context.listRef.current[index] = node;
+                }}
+              >
+                {content}
+              </ToastElement>
+            )
+          )}
+        </ul>
+      </FloatingFocusManager>
       {children}
     </ToastContext.Provider>
   );
 }
 
 type ToastContentProps = {
+  idx: number;
   toastId: string;
   appearance?: AppearanceTypes;
   autoDismiss?: boolean;
@@ -160,9 +214,23 @@ type ToastContentProps = {
 } & React.HTMLAttributes<HTMLDivElement>;
 
 export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
-  ({ toastId, appearance, autoDismiss, children }, propRef) => {
+  ({ idx, toastId, appearance, autoDismiss, children }, propRef) => {
     const [timerId, setTimerId] = React.useState<number | null>(null);
-    const { context, removeToast, autoDismissTimeout } = useToastsContext();
+    const {
+      context,
+      removeToast,
+      autoDismissTimeout,
+      dismiss,
+      click,
+      hover,
+      listNavigation,
+    } = useToastsContext();
+    const { getItemProps } = useInteractions([
+      dismiss,
+      click,
+      hover,
+      listNavigation,
+    ]);
     const { styles } = useTransitionStyles(context, {
       duration: 300,
       initial: () => ({
@@ -226,7 +294,9 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
     return (
       <li
         ref={propRef}
-        tabIndex={-1}
+        role="status"
+        aria-atomic="true"
+        tabIndex={0}
         style={{
           width: "300px",
           backgroundColor: getColor(appearance),
@@ -237,6 +307,13 @@ export const ToastElement = React.forwardRef<HTMLLIElement, ToastContentProps>(
           display: "flex",
           ...styles,
         }}
+        {...getItemProps({
+          onKeyDown: (e) => {
+            if (e.key === "Enter") {
+              removeToast(toastId);
+            }
+          },
+        })}
       >
         {children}
         <div
